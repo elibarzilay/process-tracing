@@ -1,0 +1,27 @@
+{
+  "name": "process-tracing",
+  "description": "Process TypeScript tracing files",
+  "author": "Eli Barzilay <eli@barzilay.org> (https://barzilay.org/)",
+  "homepage": "https://github.com/elibarzilay/process-tracing#readme",
+  "version": "1.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/elibarzilay/process-tracing.git"
+  },
+  "bugs": {
+    "url": "https://github.com/elibarzilay/process-tracing/issues"
+  },
+  "main": "index.js",
+  "bin": {
+    "process-tracing": "index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "jsonstream-next": "^3.0.0",
+    "split2": "^3.2.2",
+    "yargs": "^16.2.0"
+  }
+}
