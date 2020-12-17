@@ -41,7 +41,7 @@ async function run(fast = true) {
   //
   const stack = [];
   let lastTime = 0;
-  const makeX = (x, until) => JSON.stringify({...x, ph: "X", dur: until - x.ts});
+  const makeX = (x, until) => test({...x, ph: "X", dur: until - x.ts});
   const getTail =
     args.join && args.close ? () => stack.reverse().map(x => makeX(x, lastTime))
     : args.close ? () => stack.reverse().map(x => JSON.stringify({...x, ph: "E", ts: lastTime}))
@@ -72,10 +72,8 @@ async function run(fast = true) {
       }
     }
     if (instantTypes.includes(x.ph)
-        || ((!args.sample ||
-             (args.sample - x.ts % args.sample) <= x.dur
-             // Math.floor(x.ts/args.sample) !== Math.floor((x.ts+x.dur)/args.sample)
-            )
+        || ((!args.sample // test if [ts,ts+dur] straddles a sampling point
+             || (args.sample - x.ts % args.sample) <= x.dur)
             && (!args.minDur || x.dur > args.minDur))) {
       return str();
     }
@@ -95,7 +93,7 @@ async function run(fast = true) {
       async function* (inp) {
         const disp = x => (comma ? ",\n" : (comma = true, "[\n")) + x;
         for await (const x of inp) yield disp(x);
-        for (const x of getTail()) yield disp(x);
+        for (const x of getTail()) if (x) yield disp(x);
         yield "\n]\n";
       },
       ...(/\.gz$/.test(args.output) ? [zlib.createGzip()]
