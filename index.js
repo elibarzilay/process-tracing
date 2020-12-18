@@ -33,6 +33,22 @@ const args = yargs(process.argv.slice(2))
     .strict())
   .argv;
 
+// Wrap jsonstream in a transform so we can handle errors independently,
+// otherwisewe can lose a considerable amount of lines when there's an error.
+const { Transform, PassThrough } = require("stream");
+const jsonTransform = (fn) => {
+  const pass = new PassThrough();
+  const data = pass.pipe(jsonstream.parse("*", fn));
+  data.on("data", item => tran.push(item));
+  data.on("error", e => console.log(`Error: ${e.message}\n=> truncating input`));
+  data.on("end", () => tran.end());
+  const tran = new Transform({
+    readableObjectMode: true,
+    transform(chunk, encoding, callback) { setImmediate(() => pass.write(chunk, encoding, callback)); }
+  });
+  return tran;
+};
+
 const joinTypes = (args.join || args.close || args.verify) ? "BE".split("") : [];
 const instantTypes = (joinTypes.length ? "MI" : "MIBE").split(""); // no duration => always included
 
@@ -89,7 +105,7 @@ async function run(fast = true) {
           : []),
       fast
         ? split(/,?\r?\n/, x => x.length > 1 ? test(JSON.parse(x), () => x) : undefined)
-        : jsonstream.parse("*", x => test(x)),
+        : jsonTransform(test), // jsonstream.parse("*", x => test(x)) // see above
       async function* (inp) {
         const disp = x => (comma ? ",\n" : (comma = true, "[\n")) + x;
         for await (const x of inp) yield disp(x);
