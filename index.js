@@ -33,14 +33,36 @@ const args = yargs(process.argv.slice(2))
     .strict())
   .argv;
 
+const inputStats = (()=>{
+  let stats;
+  try {
+    stats = fs.statSync(args.input);
+  } catch (e) {
+    console.error(`error: file "${args.input}" not found`);
+    process.exit(1);
+  }
+  if (stats.isDirectory()) {
+    console.error(`error: "${args.input}" is a directory`);
+    process.exit(1);
+  }
+  return stats;
+})();
+
 // Wrap jsonstream in a transform so we can handle errors independently,
 // otherwisewe can lose a considerable amount of lines when there's an error.
 const { Transform, PassThrough } = require("stream");
+let reader; // used for estimating where we're stuck when there's a parsing error
 const jsonTransform = (fn) => {
   const pass = new PassThrough();
-  const data = pass.pipe(jsonstream.parse("*", fn));
+  const data = pass.pipe(jsonstream.parse("*", x => fn(x)));
   data.on("data", item => tran.push(item));
-  data.on("error", e => console.log(`Error: ${e.message}\n=> truncating input`));
+  data.on("error", e => {
+    console.log(`error: ${e.message}`);
+    const where = reader.bytesRead === inputStats.size
+          ? "near the end"
+          : `after reading ${reader.bytesRead} of ${inputStats.size} bytes`
+    console.log(`=> truncating input ${where}.`);
+  });
   data.on("end", () => tran.end());
   const tran = new Transform({
     readableObjectMode: true,
@@ -52,8 +74,7 @@ const jsonTransform = (fn) => {
 const joinTypes = (args.join || args.close || args.verify) ? "BE".split("") : [];
 const instantTypes = (joinTypes.length ? "MI" : "MIBE").split(""); // no duration => always included
 
-async function run(fast = true) {
-  console.log(fast ? "Processing..." : "  (retrying with a full parser)");
+async function processFile(fastMode) {
   //
   const stack = [];
   let lastTime = 0;
@@ -75,14 +96,14 @@ async function run(fast = true) {
       } else { // === "E"
         const top = stack.pop();
         if (top === undefined)
-          throw Error(`Verification error: no B event for ${str()}`);
+          throw Error(`verification error: no B event for ${str()}`);
         if (args.verify) {
           if (top.cat !== x.cat)
-            throw Error(`Verification error: different "cat" in ${str()}`);
+            throw Error(`verification error: different "cat" in ${str()}`);
           if (top.name !== x.name)
-            throw Error(`Verification error: different "name" in ${str()}`);
+            throw Error(`verification error: different "name" in ${str()}`);
           if (JSON.stringify(top.args) !== JSON.stringify(x.args))
-            throw Error(`Verification error: different "args" in ${str()}`);
+            throw Error(`verification error: different "args" in ${str()}`);
         }
         return !args.join ? str() : makeX(top, x.ts);
       }
@@ -99,11 +120,11 @@ async function run(fast = true) {
   let comma = false;
   try {
     await pipeline(
-      fs.createReadStream(args.input),
+      reader = fs.createReadStream(args.input),
       ...(/\.gz$/.test(args.input) ? [zlib.createGunzip()]
           : /\.br$/.test(args.input) ? [zlib.createBrotliDecompress()]
           : []),
-      fast
+      fastMode
         ? split(/,?\r?\n/, x => x.length > 1 ? test(JSON.parse(x), () => x) : undefined)
         : jsonTransform(test), // jsonstream.parse("*", x => test(x)) // see above
       async function* (inp) {
@@ -119,8 +140,21 @@ async function run(fast = true) {
     );
     console.log("Done.");
   } catch (e) {
-    if (fast && e instanceof SyntaxError && /JSON/.test(e.message)) return run(false);
+    if (fastMode && e instanceof SyntaxError && /JSON/.test(e.message)) {
+      console.log("  (retrying with a full parser)");
+      return processFile(false);
+    }
     throw e;
+  }
+}
+
+async function run() {
+  console.log("Processing...");
+  if (inputStats.isFile()) {
+    processFile(true);
+  } else {
+    console.log("  (input is not a plain file => slow mode)");
+    processFile(false);
   }
 }
 
