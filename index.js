@@ -8,7 +8,8 @@ const zlib = require("zlib");
 const jsonstream = require("jsonstream-next");
 const split = require("split2");
 const yargs = require("yargs");
-const { pipeline } = require("stream/promises");
+// const { pipeline } = require("stream/promises"); // node v15
+const pipeline = require("util").promisify(require("stream").pipeline);
 
 const args = yargs(process.argv.slice(2))
   .command("$0 <input> <output>", "Preprocess tracing dumps", yargs => yargs

@@ -3,7 +3,7 @@
   "description": "Process TypeScript tracing files",
   "author": "Eli Barzilay <eli@barzilay.org> (https://barzilay.org/)",
   "homepage": "https://github.com/elibarzilay/process-tracing#readme",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "license": "MIT",
   "repository": {
     "type": "git",
