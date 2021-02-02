@@ -11,16 +11,20 @@ const yargs = require("yargs");
 // const { pipeline } = require("stream/promises"); // node v15
 const pipeline = require("util").promisify(require("stream").pipeline);
 
+const miliToMicro = n => 1000 * (typeof n === "number" ? n : +n);
+
 const args = yargs(process.argv.slice(2))
   .command("$0 <input> <output>", "Preprocess tracing dumps", yargs => yargs
     .positional("input", { type: "string", desc: "json file to read (possibly compressed)" })
     .positional("output", { type: "string", desc: "json file to write (possibly compressed)" })
     .options({"s": { alias: "sample",
                      describe: "sample events at this frequency (msec) ",
-                     type: "number" },
+                     type: "number",
+                     coerce: miliToMicro},
               "m": { alias: "min-dur",
                      describe: "filter events with this minimum duration (msec)",
-                     type: "number" },
+                     type: "number",
+                     coerce: miliToMicro },
               "j": { alias: "join",
                      describe: "join B/E events to a single X event",
                      type: "boolean" },
